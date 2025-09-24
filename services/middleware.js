@@ -3,9 +3,55 @@
  * Acts as a bridge between blockchain/IPFS and client
  * Fetches, transforms, and organizes data for clean client responses
  */
+const fs = require('fs');
+const path = require('path');
+const { generateCTField, hexToDateString } = require('../utils/timestamp');
+
 class MiddlewareService {
   constructor() {
+    this.defaults = {};
+    this.deviceDataMap = new Map();
+    this.loadDefaults();
     console.log('✅ Middleware service initialized');
+  }
+
+  /**
+   * Load default values from storage/defaults.json
+   */
+  loadDefaults() {
+    try {
+      const defaultsFile = path.join(__dirname, '..', 'storage', 'defaults.json');
+      if (fs.existsSync(defaultsFile)) {
+        const fileContent = fs.readFileSync(defaultsFile, 'utf8');
+        this.defaults = JSON.parse(fileContent);
+        console.log(`📋 Loaded ${Object.keys(this.defaults).length} default values`);
+      } else {
+        console.log('📋 No defaults file found');
+      }
+    } catch (error) {
+      console.error('❌ Error loading defaults:', error.message);
+      this.defaults = {};
+    }
+  }
+
+  /**
+   * Get field value with fallback to defaults
+   * @param {string} fieldName - Field name (e.g., "BT", "BW", "SN")
+   * @returns {string} - Field value or default
+   */
+  getFieldValue(fieldName) {
+    // First try to get from IPFS content
+    if (this.deviceDataMap && this.deviceDataMap.has(fieldName)) {
+      return this.deviceDataMap.get(fieldName);
+    }
+    
+    // Fallback to default value
+    if (this.defaults[fieldName]) {
+      return this.defaults[fieldName];
+    }
+    
+    // If no default available, return empty string
+    return '';
   }
 
   /**
@@ -45,11 +91,14 @@ class MiddlewareService {
       let ipfsContent = null;
       if (deviceMetadata && deviceMetadata.includes('/')) {
         const cid = deviceMetadata.split('/')[1];
-        console.log(`�� Fetching IPFS content for CID: ${cid}`);
+        console.log(`🔍 Fetching IPFS content for CID: ${cid}`);
         
         const ipfsContentString = await ipfsService.getFile(cid);
         ipfsContent = JSON.parse(ipfsContentString);
       }
+
+      // Initialize deviceDataMap with IPFS content
+      this.deviceDataMap = ipfsContent && ipfsContent.data ? new Map(ipfsContent.data) : new Map();
       
       // Step 4: Transform data for client
       const transformedData = this.transformDataForClient(ipfsContent, deviceState, params);
@@ -74,25 +123,20 @@ class MiddlewareService {
    * Adds middleware-specific fields and organizes data
    */
   transformDataForClient(ipfsContent, deviceState, params) {
-    if (!ipfsContent || !ipfsContent.data) {
-      return {
-        message: `Start ticket - s: ${params.s}, d: ${params.d}`,
-        data: [["V", "1"]]
-      };
+    // Default message for checkme requests
+    let message = `Start ticket - s: ${params.s}, d: ${params.d}`;
+    if (params.t !== 'checkme') {
+      message = `Normal Ticket: ${params.t}`;
     }
 
     // Start with V=1 at position 0
     const data = [["V", "1"]];
     
-    // Check if t parameter is "checkme" and add TT field at position 1
-    console.log(params.t)
+    // Determine TT value based on 't' parameter and deviceState
+    let ttValue;
     if (params.t === 'checkme') {
-      data.push(["TT", "S"]);
-      console.log("t is checkme")
+      ttValue = "S";
     } else {
-      console.log("t is not checkme")
-      // Switch case for deviceState to determine TT value
-      let ttValue;
       switch (deviceState) {
         case "0":
           ttValue = "F";
@@ -107,21 +151,22 @@ class MiddlewareService {
           ttValue = "Unknown";
           break;
       }
-      data.push(["TT", ttValue]);
     }
-    
-    // Add all IPFS data fields
-    if (Array.isArray(ipfsContent.data)) {
-      for (const tuple of ipfsContent.data) {
-        if (Array.isArray(tuple) && tuple.length === 2) {
-          data.push([String(tuple[0]), String(tuple[1])]);
-        }
-      }
-    }
-    
+    data.push(["TT", ttValue]);
+
+    // Add specific fields from IPFS content in order, with defaults as fallback
+    data.push(["BT", this.getFieldValue("BT")]);
+    data.push(["BW", this.getFieldValue("BW")]);
+    data.push(["SN", this.getFieldValue("SN")]);
+    data.push(["CT", generateCTField()]);
+
+    data.push(["LD", this.getFieldValue("LD")]);
+    data.push(["TW", this.getFieldValue("TW")]); 
+    data.push(["MaxUC", this.getFieldValue("MaxUC")]);
+    data.push(["Authenticator", this.getFieldValue("Authenticator")]);
     
     return {
-      message: `Start ticket - s: ${params.s}, d: ${params.d}`,
+      message: message,
       data: data
     };
   }
