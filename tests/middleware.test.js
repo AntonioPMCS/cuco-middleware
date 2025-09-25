@@ -35,7 +35,7 @@ describe('MiddlewareService', () => {
     });
 
     test('should use custom epoch (40 years after UNIX epoch)', () => {
-      const customEpoch = getCustomEpoch();
+      const customEpoch = getCucoEpoch();
       const expectedEpoch = new Date('2010-01-01T00:00:00.000Z').getTime() / 1000;
       
       expect(customEpoch).toBe(expectedEpoch);

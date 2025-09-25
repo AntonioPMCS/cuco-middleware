@@ -5,7 +5,8 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { generateCTField, hexToDateString } = require('../utils/timestamp');
+const { generateCTField, generateLDField, hexToDateString } = require('../utils/timestamp');
+const { serializeData } = require('../utils/parsers');
 
 class MiddlewareService {
   constructor() {
@@ -63,7 +64,7 @@ class MiddlewareService {
    * 5. Transform and organize data
    * 6. Return clean response
    */
-  async processRequest(ethereumService, ipfsService, params) {
+  async processRequest(ethereumService, ipfsService, cryptoService, params) {
     try {
       const { s, d, t } = params;
       let sn = t;
@@ -101,7 +102,7 @@ class MiddlewareService {
       this.deviceDataMap = ipfsContent && ipfsContent.data ? new Map(ipfsContent.data) : new Map();
       
       // Step 4: Transform data for client
-      const transformedData = this.transformDataForClient(ipfsContent, deviceState, params);
+      const transformedData = this.transformDataForClient(deviceState, cryptoService, params);
       
       return {
         success: true,
@@ -122,7 +123,7 @@ class MiddlewareService {
    * Transform IPFS content into clean client response
    * Adds middleware-specific fields and organizes data
    */
-  transformDataForClient(ipfsContent, deviceState, params) {
+  transformDataForClient(deviceState, cryptoService, params) {
     // Default message for checkme requests
     let message = `Start ticket - s: ${params.s}, d: ${params.d}`;
     if (params.t !== 'checkme') {
@@ -160,14 +161,16 @@ class MiddlewareService {
     data.push(["SN", this.getFieldValue("SN")]);
     data.push(["CT", generateCTField()]);
 
-    data.push(["LD", this.getFieldValue("LD")]);
+    data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
     data.push(["TW", this.getFieldValue("TW")]); 
     data.push(["MaxUC", this.getFieldValue("MaxUC")]);
-    data.push(["Authenticator", this.getFieldValue("Authenticator")]);
-    
+    // Add Authenticator field
+    const authenticator = cryptoService.hmacSha256Hex(serializeData(data));
+    data.push(["Authenticator", authenticator]);
+
     return {
       message: message,
-      data: data
+      data: serializeData(data)
     };
   }
 }

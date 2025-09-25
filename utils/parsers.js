@@ -49,7 +49,25 @@ function parseMetadataString(metadataString) {
   }
 }
 
+
+/**
+   * Serialize data array into string format
+   * Each array member is separated by "\n"
+   * @param {Array} dataArray - Array of [key, value] pairs
+   * @returns {string} - Serialized string with newline separators
+   */
+function serializeData(dataArray) {
+  if (!Array.isArray(dataArray)) {
+    return '';
+  }
+  
+  return dataArray
+    .map(([key, value]) => `${key}:${value}`)
+    .join('\n');
+}
+
 module.exports = {
   parseIPFSContent,
-  parseMetadataString
+  parseMetadataString,
+  serializeData
 };

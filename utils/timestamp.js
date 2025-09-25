@@ -3,18 +3,18 @@
  * Handles timestamp generation and conversion for middleware
  */
 
-// Custom epoch: 40 years after UNIX epoch (January 1, 2010)
-const CUSTOM_EPOCH = new Date('2010-01-01T00:00:00.000Z').getTime() / 1000;
+// Cuco epoch: 40 years after UNIX epoch (January 1, 2010)
+const CUCO_EPOCH = new Date('2010-01-01T00:00:00.000Z').getTime() / 1000;
 
 /**
  * Generate CT field - current timestamp in hexadecimal format
- * Uses custom epoch (40 years after UNIX epoch)
+ * Uses Cuco epoch (40 years after UNIX epoch)
  * @returns {string} - Current timestamp as hex string
  */
 function generateCTField() {
-  // Get current timestamp in seconds since custom epoch
+  // Get current timestamp in seconds since Cuco epoch
   const currentTimestamp = Math.floor(Date.now() / 1000);
-  const customTimestamp = currentTimestamp - CUSTOM_EPOCH;
+  const customTimestamp = currentTimestamp - CUCO_EPOCH;
   
   // Convert to hexadecimal
   const hexTimestamp = customTimestamp.toString(16);
@@ -29,7 +29,7 @@ function generateCTField() {
  */
 function hexToDateString(hexTimestamp) {
   const decimalTimestamp = parseInt(hexTimestamp, 16);
-  const unixTimestamp = decimalTimestamp + CUSTOM_EPOCH;
+  const unixTimestamp = decimalTimestamp + CUCO_EPOCH;
   const date = new Date(unixTimestamp * 1000);
   return date.toISOString();
 }
@@ -53,11 +53,37 @@ function hexToDecimal(hexTimestamp) {
 }
 
 /**
- * Get the custom epoch timestamp
- * @returns {number} - Custom epoch in seconds since UNIX epoch
+ * Get the Cuco epoch timestamp
+ * @returns {number} - Cuco epoch in seconds since UNIX epoch
  */
-function getCustomEpoch() {
-  return CUSTOM_EPOCH;
+function getCucoEpoch() {
+  return CUCO_EPOCH;
+}
+
+/**
+ * Generate LD field - calculated timestamp for ticket lifetime
+ * Formula: LD = Date.now() - CUCO_EPOCH + ticketlifetime
+ * @param {number} ticketlifetime - Ticket lifetime in seconds
+ * @returns {string} - LD field value as hex string
+ */
+function generateLDField(ticketlifetime) {
+  // Convert Date.now() to seconds and calculate LD field
+  const currentTimestampMs = Date.now();
+  const currentTimestampSeconds = Math.floor(currentTimestampMs / 1000);
+  // Log the values
+  console.log("currentTimestampSeconds: ", currentTimestampSeconds);
+  console.log("CUCO_EPOCH: ", CUCO_EPOCH);
+  console.log("ticketlifetime: ", ticketlifetime);
+  
+  const LD = currentTimestampSeconds - CUCO_EPOCH + ticketlifetime;
+  
+  // Convert to hexadecimal
+  const hexLD = LD.toString(16);
+
+  //Log the LD field value
+  console.log("LD field value: ", hexLD);
+  
+  return hexLD;
 }
 
 module.exports = {
@@ -65,5 +91,6 @@ module.exports = {
   hexToDateString,
   decimalToHex,
   hexToDecimal,
-  getCustomEpoch
+  getCucoEpoch,
+  generateLDField
 };

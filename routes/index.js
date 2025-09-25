@@ -2,12 +2,14 @@ const express = require('express');
 const EthereumService = require('../services/ethereum');
 const IPFSService = require('../services/ipfs');
 const MiddlewareService = require('../services/middleware');
+const CryptographyService = require('../services/cryptography');
 const router = express.Router();
 
 // Initialize services
 const ethereumService = new EthereumService();
 const ipfsService = new IPFSService();
 const middlewareService = new MiddlewareService();
+const cryptoService = new CryptographyService("4E8ADD61E02DCD2FDAD9457D9738E370");
 
 // Route handler for the root path that accepts URL parameter 't'
 router.get('/', async (req, res) => {
@@ -17,7 +19,7 @@ router.get('/', async (req, res) => {
     const d = req.query.d;
 
     // Always use middleware service to process the complete flow
-    const result = await middlewareService.processRequest(ethereumService, ipfsService, { s, d, t });
+    const result = await middlewareService.processRequest(ethereumService, ipfsService, cryptoService, { s, d, t });
     
     if (result.success) {
       return res.json(result.data);
