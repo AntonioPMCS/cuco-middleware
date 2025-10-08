@@ -9,7 +9,7 @@ class EthereumMock {
   }
 
   async getDeviceMetadata(deviceAddress) {
-    return 'ipfs://bafkreibaqbylj5xkpxtgc4tz4c2qf4forvvq4tqnmlszyxws5y5q5oi4ti';
+    return 'ipfs://bafkreib55r7osq7xpnnji2lc2ix5iljabblmpomtd5bacm7ibz3coybuli';
   }
 
   async getDeviceSerialNumber(deviceAddress) {

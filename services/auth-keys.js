@@ -43,11 +43,14 @@ class AuthKeyService {
   /**
    * Get authentication key for a device
    * @param {string} deviceSN - Device serial number
-   * @returns {string|null} - Authentication key or null if not found
+   * @returns {Object} - Object of keys ("AK" and "UK")
    */
-  getAuthKey(deviceSN) {
-    return this.keys[deviceSN] || null;
+  getKeys(deviceSN) {
+    this.loadKeys();
+    console.log("Keys: ", this.keys);
+    return this.keys[deviceSN];
   }
+
 
   /**
    * List all devices with authentication keys

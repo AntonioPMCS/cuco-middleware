@@ -17,7 +17,7 @@ function generateCTField() {
   const customTimestamp = currentTimestamp - CUCO_EPOCH;
   
   // Convert to hexadecimal
-  const hexTimestamp = customTimestamp.toString(16);
+  const hexTimestamp = customTimestamp.toString(16).toUpperCase();
   
   return hexTimestamp;
 }

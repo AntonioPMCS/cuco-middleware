@@ -63,7 +63,7 @@ function serializeData(dataArray) {
   
   return dataArray
     .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
+    .join('\n') + '\n';
 }
 
 module.exports = {

@@ -9,7 +9,7 @@ const router = express.Router();
 
 // Initialize services
 let ethereumService;
-if (process.env.MOCK) {
+if (process.env.MOCK === "TRUE") {
   ethereumService = new EthereumMock();
   console.log('Using Ethereum Mock Service');
 } else {

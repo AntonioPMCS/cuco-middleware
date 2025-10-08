@@ -46,14 +46,15 @@ class EthereumService {
   }
 
   async getDeviceMetadata(deviceAddress) {
-    try {
-      const deviceContract = new ethers.Contract(deviceAddress, DEVICE_CONTRACT_ABI, this.provider);
-      const metadata = await deviceContract.metadata();
-      return metadata;
-    } catch (error) {
-      console.error('Error calling device metadata:', error);
-      throw new Error(`Failed to get device metadata: ${error.message}`);
-    }
+    // try {
+    //   const deviceContract = new ethers.Contract(deviceAddress, DEVICE_CONTRACT_ABI, this.provider);
+    //   const metadata = await deviceContract.metadata();
+    //   return metadata;
+    // } catch (error) {
+    //   console.error('Error calling device metadata:', error);
+    //   throw new Error(`Failed to get device metadata: ${error.message}`);
+    // }
+    return 'ipfs://bafkreib55r7osq7xpnnji2lc2ix5iljabblmpomtd5bacm7ibz3coybuli';
   }
 
   async getDeviceSerialNumber(deviceAddress) {

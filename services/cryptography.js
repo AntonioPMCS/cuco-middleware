@@ -11,17 +11,28 @@ class CryptographyService {
      * @param {string} ticket - The ticket to hash
      * @returns {string} - The HMAC-SHA256 hex string
      */
-    hmacSha256Hex(ticket, keyString) {
-      // Print the ticket to the console
-      console.log("Ticket: ", ticket);
-      const flippedKey = endianFlipHex(keyString);
-      console.log("Flipped Key: ", flippedKey);
-      const keyBytes = Buffer.from(flippedKey, "hex"); //Converts string to a buffer of bytes
-      
+    async hmacSha256Hex(message, key) {
+      console.log("Message: ", message);
+      const encoder = new TextEncoder();
+      const keyData = Buffer.from(key, "hex");
+      const messageData = encoder.encode(message);
 
-      return crypto.createHmac("sha256", keyBytes)
-              .update(ticket, "utf8")
-              .digest("hex");
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "HMAC", hash: { name: "SHA-256" } },
+        false,
+        ["sign"]
+      );
+
+      const signature = await crypto.subtle.sign("HMAC", cryptoKey, messageData);
+
+      const hashArray = Array.from(new Uint8Array(signature));
+      const hashHex = hashArray
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      console.log("Hash Hex: ", hashHex);
+      return hashHex;
     }
 }
 

@@ -1,7 +1,7 @@
 {
-  "IT": "Instalacao do CUCo\n\n(esta mensagem repete-se na desativacao...)",
-  "BT": "Your computer is locked by CUCo Firmware security\nPlease contact your seller or the CUCo Firmware Support Team at support@cuco-firmware.com or try to unlock at \nbeta.cuco-firmware.com/ucode/",
-  "BW": "This is a test warning message This is a test warning message :GNV: :FI:86400",
+  "IT": "DEFAULT - Instalacao do CUCo\\n\\n(esta mensagem repete-se na desativacao...)",
+  "BT": "DEFAULT - Your computer is locked by CUCo Firmware security\\nPlease contact your seller or the CUCo Firmware Support Team at support@cuco-firmware.com",
+  "BW": "DEFAULT - This is a test warning message This is a test warning message :GNV: :FI:86400",
   "TW": "02A300",
   "MaxUC": "64",
   "ticketlifetime": "5184000"

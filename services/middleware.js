@@ -7,11 +7,12 @@ const fs = require('fs');
 const path = require('path');
 const { generateCTField, generateLDField, hexToDateString } = require('../utils/timestamp');
 const { serializeData } = require('../utils/parsers');
+const { endianFlipHex } = require('../utils/bytes');
 
 class MiddlewareService {
   constructor() {
     this.defaults = {};
-    this.deviceDataMap = new Map();
+    this.deviceData = {};
     this.loadDefaults();
     console.log('✅ Middleware service initialized');
   }
@@ -42,17 +43,7 @@ class MiddlewareService {
    */
   getFieldValue(fieldName) {
     // First try to get from IPFS content
-    if (this.deviceDataMap && this.deviceDataMap.has(fieldName)) {
-      return this.deviceDataMap.get(fieldName);
-    }
-    
-    // Fallback to default value
-    if (this.defaults[fieldName]) {
-      return this.defaults[fieldName];
-    }
-    
-    // If no default available, return empty string
-    return '';
+    return this.deviceData[fieldName] || this.defaults[fieldName] || '';
   }
 
   /**
@@ -65,9 +56,10 @@ class MiddlewareService {
    * 6. Return clean response
    */
   async processRequest(ethereumService, ipfsService, cryptoService, authKeyService, params) {
+    
     try {
       const { s, d, t } = params;
-      let sn = t;
+      let deviceAddress = "0x"+t.toLowerCase();
       
       // Step 1: Validate request parameters
       if (t === 'checkme') {
@@ -78,34 +70,28 @@ class MiddlewareService {
             statusCode: 400
           };
         } else {
-          sn = s;
+          deviceAddress = (await ethereumService.getDeviceBySn(s)).toLowerCase();
         }
       }
       
       // Step 2: Fetch blockchain data
       // TODO: Make this a single call using the multicall contract
       console.log('🔗 Fetching blockchain data...');
-      const deviceAddress = await ethereumService.getDeviceBySn(sn);
-      const deviceMetadata = await ethereumService.getDeviceMetadata(deviceAddress);
       const deviceState = await ethereumService.getDeviceState(deviceAddress);
+      const deviceMetadata = await ethereumService.getDeviceMetadata(deviceAddress);
+
 
       // Step 3: Extract CID and fetch IPFS content
-      let ipfsContent = null;
       if (deviceMetadata && deviceMetadata.includes('/')) {
-        console.log('❌ Device metadata is not a valid IPFS CID:', deviceMetadata);
         const cid = deviceMetadata.split('/')[2];
-        console.log('❌ CID:', cid);
         console.log(`🔍 Fetching IPFS content for CID: ${cid}`);
         
         const ipfsContentString = await ipfsService.getFile(cid);
-        ipfsContent = JSON.parse(ipfsContentString);
+        this.deviceData = JSON.parse(ipfsContentString);
       }
-
-      // Initialize deviceDataMap with IPFS content
-      this.deviceDataMap = ipfsContent && ipfsContent.data ? new Map(ipfsContent.data) : new Map();
       
       // Step 4: Transform data for client
-      const transformedData = this.transformDataForClient(deviceState, cryptoService, authKeyService, params, sn);
+      const transformedData = await this.transformDataForClient(deviceState, deviceAddress, cryptoService, authKeyService, params);
       
       return {
         success: true,
@@ -126,48 +112,77 @@ class MiddlewareService {
    * Transform IPFS content into clean client response
    * Adds middleware-specific fields and organizes data
    */
-  transformDataForClient(deviceState, cryptoService, authKeyService, params, sn) {
+  async transformDataForClient(deviceState, deviceAddress, cryptoService, authKeyService, params) {
 
+    const keys = authKeyService.getKeys(deviceAddress);
+    let authenticator;
     // Start with V=1 at position 0
     const data = [["V", "1"]];
+    
     
     // Determine TT value based on 't' parameter and deviceState
     let ttValue;
     if (params.t === 'checkme') {
-      ttValue = "S";
+      data.push(["TT", "S"]);
+      data.push(["IT", this.getFieldValue("IT")]);
+      // Add specific fields from IPFS content in order, with defaults as fallback
+      data.push(["BT", this.getFieldValue("BT")]);
+      data.push(["BW", this.getFieldValue("BW")]);
+      data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+      data.push(["CT", generateCTField()]);
+      data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
+      data.push(["TW", this.getFieldValue("TW")]); 
+      data.push(["MaxUC", this.getFieldValue("MaxUC")]);
+
+      authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+      data.push(["Authenticator", authenticator]);
+
+      data.push(["AKT", "S"]);
+      data.push(["AK", keys["AK"]]);
+      data.push(["UK", keys["UK"]]);
+
     } else {
+
       switch (deviceState) {
-        case "0":
-          ttValue = "F";
+        case "0": // Free
+          data.push(["TT", 'F']);
+          data.push(["IT", this.getFieldValue("IT")]);
+          // Add specific fields from IPFS content in order, with defaults as fallback
+          data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+          data.push(["CT", generateCTField()]);
+
+          authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+          data.push(["Authenticator", authenticator]);
           break;
-        case "1":
-          ttValue = "N";
+
+        case "1": // Normal
+          data.push(["TT", 'N']);
+          data.push(["BT", this.getFieldValue("BT")]);
+          data.push(["BW", this.getFieldValue("BW")]);
+          data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+          data.push(["CT", generateCTField()]);
+          data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
+          data.push(["TW", this.getFieldValue("TW")]); 
+          data.push(["MaxUC", this.getFieldValue("MaxUC")]);
+
+          authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+          data.push(["Authenticator", authenticator]);
           break;
-        case "2":
-          ttValue = "B";
+
+        case "2": // Blocked
+          data.push(["TT", 'B']);
+          data.push(["BT", this.getFieldValue("BT")]);
+          data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+          data.push(["CT", generateCTField()]);
+          authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+          data.push(["Authenticator", authenticator]);
+
           break;
         default:
           ttValue = "Unknown";
           break;
       }
     }
-    data.push(["TT", ttValue]);
-
-    // Add specific fields from IPFS content in order, with defaults as fallback
-    data.push(["BT", this.getFieldValue("BT")]);
-    data.push(["BW", this.getFieldValue("BW")]);
-    data.push(["SN", this.getFieldValue("SN")]);
-    data.push(["CT", generateCTField()]);
-
-    data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
-    data.push(["TW", this.getFieldValue("TW")]); 
-    data.push(["MaxUC", this.getFieldValue("MaxUC")]);
-
-    // Add Authenticator field
-    // Look up the key in auth-keys.json using the sn
-    const key = authKeyService.getAuthKey(sn);
-    const authenticator = cryptoService.hmacSha256Hex(serializeData(data), key);
-    data.push(["Authenticator", authenticator]);
 
     return serializeData(data);
   }
