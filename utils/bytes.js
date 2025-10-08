@@ -26,20 +26,22 @@ function bytesToHex(bytes) {
 
 /**
  * Flip the bytes of a hex string
- * @param {string} hex - The hex string to flip
+ * @param {string} hexStr - The hex string to flip
  * @returns {string} - The flipped hex string
  */
-function flipHexBytes(hex) {
-    if (hex.length % 2 !== 0) {
-        throw new Error("Hex string must have even length");
-      }
-    return hex.match(/../g).reverse().join("");
+function endianFlipHex(hexStr) {
+  hexStr = hexStr.toLowerCase();
+  if (hexStr.length % 2 !== 0) {
+    throw new Error("Hex string must have even length");
+  }
+
+  return hexStr.match(/../g).reverse().join("");
 }
 
 
 module.exports = {
   hexToBytes,
   bytesToHex,
-  flipHexBytes
+  endianFlipHex
 };
   

@@ -1,15 +1,24 @@
 const express = require('express');
 const EthereumService = require('../services/ethereum');
+const EthereumMock = require('../services/ethereum_mock');
 const IPFSService = require('../services/ipfs');
 const MiddlewareService = require('../services/middleware');
 const CryptographyService = require('../services/cryptography');
+const AuthKeyService = require('../services/auth-keys');
 const router = express.Router();
 
 // Initialize services
-const ethereumService = new EthereumService();
+let ethereumService;
+if (process.env.MOCK) {
+  ethereumService = new EthereumMock();
+  console.log('Using Ethereum Mock Service');
+} else {
+  ethereumService = new EthereumService();
+}
 const ipfsService = new IPFSService();
 const middlewareService = new MiddlewareService();
-const cryptoService = new CryptographyService("4E8ADD61E02DCD2FDAD9457D9738E370");
+const cryptoService = new CryptographyService();
+const authKeyService = new AuthKeyService();
 
 // Route handler for the root path that accepts URL parameter 't'
 router.get('/', async (req, res) => {
@@ -19,10 +28,10 @@ router.get('/', async (req, res) => {
     const d = req.query.d;
 
     // Always use middleware service to process the complete flow
-    const result = await middlewareService.processRequest(ethereumService, ipfsService, cryptoService, { s, d, t });
+    const result = await middlewareService.processRequest(ethereumService, ipfsService, cryptoService, authKeyService, { s, d, t });
     
     if (result.success) {
-      return res.json(result.data);
+      return res.send(result.data);
     } else {
       // Handle validation errors with proper status codes
       const statusCode = result.statusCode || 500;

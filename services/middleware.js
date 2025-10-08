@@ -64,7 +64,7 @@ class MiddlewareService {
    * 5. Transform and organize data
    * 6. Return clean response
    */
-  async processRequest(ethereumService, ipfsService, cryptoService, params) {
+  async processRequest(ethereumService, ipfsService, cryptoService, authKeyService, params) {
     try {
       const { s, d, t } = params;
       let sn = t;
@@ -83,6 +83,7 @@ class MiddlewareService {
       }
       
       // Step 2: Fetch blockchain data
+      // TODO: Make this a single call using the multicall contract
       console.log('🔗 Fetching blockchain data...');
       const deviceAddress = await ethereumService.getDeviceBySn(sn);
       const deviceMetadata = await ethereumService.getDeviceMetadata(deviceAddress);
@@ -91,7 +92,9 @@ class MiddlewareService {
       // Step 3: Extract CID and fetch IPFS content
       let ipfsContent = null;
       if (deviceMetadata && deviceMetadata.includes('/')) {
-        const cid = deviceMetadata.split('/')[1];
+        console.log('❌ Device metadata is not a valid IPFS CID:', deviceMetadata);
+        const cid = deviceMetadata.split('/')[2];
+        console.log('❌ CID:', cid);
         console.log(`🔍 Fetching IPFS content for CID: ${cid}`);
         
         const ipfsContentString = await ipfsService.getFile(cid);
@@ -102,7 +105,7 @@ class MiddlewareService {
       this.deviceDataMap = ipfsContent && ipfsContent.data ? new Map(ipfsContent.data) : new Map();
       
       // Step 4: Transform data for client
-      const transformedData = this.transformDataForClient(deviceState, cryptoService, params);
+      const transformedData = this.transformDataForClient(deviceState, cryptoService, authKeyService, params, sn);
       
       return {
         success: true,
@@ -123,12 +126,7 @@ class MiddlewareService {
    * Transform IPFS content into clean client response
    * Adds middleware-specific fields and organizes data
    */
-  transformDataForClient(deviceState, cryptoService, params) {
-    // Default message for checkme requests
-    let message = `Start ticket - s: ${params.s}, d: ${params.d}`;
-    if (params.t !== 'checkme') {
-      message = `Normal Ticket: ${params.t}`;
-    }
+  transformDataForClient(deviceState, cryptoService, authKeyService, params, sn) {
 
     // Start with V=1 at position 0
     const data = [["V", "1"]];
@@ -164,14 +162,14 @@ class MiddlewareService {
     data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
     data.push(["TW", this.getFieldValue("TW")]); 
     data.push(["MaxUC", this.getFieldValue("MaxUC")]);
+
     // Add Authenticator field
-    const authenticator = cryptoService.hmacSha256Hex(serializeData(data));
+    // Look up the key in auth-keys.json using the sn
+    const key = authKeyService.getAuthKey(sn);
+    const authenticator = cryptoService.hmacSha256Hex(serializeData(data), key);
     data.push(["Authenticator", authenticator]);
 
-    return {
-      message: message,
-      data: serializeData(data)
-    };
+    return serializeData(data);
   }
 }
 
