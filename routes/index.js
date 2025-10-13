@@ -22,13 +22,17 @@ const authKeyService = new AuthKeyService();
 
 // Route handler for the root path that accepts URL parameter 't'
 router.get('/', async (req, res) => {
-  try {
-    const t = req.query.t;
-    const s = req.query.s;
-    const d = req.query.d;
+  let result;
 
-    // Always use middleware service to process the complete flow
-    const result = await middlewareService.processRequest(ethereumService, ipfsService, cryptoService, authKeyService, { s, d, t });
+  try {
+    const {t, s, d} = req.query;
+    const { cid, ct, uc } = req.query;
+
+    if (cid) {
+      result = await middlewareService.processUnlockRequest(authKeyService, cryptoService, {cid, ct, uc});
+    } else {
+      result = await middlewareService.processRequest(ethereumService, ipfsService, cryptoService, authKeyService, { s, d, t });
+    }
     
     if (result.success) {
       return res.send(result.data);
@@ -43,6 +47,33 @@ router.get('/', async (req, res) => {
     
   } catch (error) {
     console.error('Route error:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+// Route handler for unlock code generation
+router.get('/ucode/getcode', async (req, res) => {
+  try {
+    const { cid, ct, uc } = req.query;
+
+    // Add your unlock code logic here
+    const result = await middlewareService.processUnlockRequest(authKeyService, cryptoService, { cid, ct, uc });
+
+    if (result.success) {
+      return res.json(result.data);
+    } else {
+      const statusCode = result.statusCode || 500;
+      return res.status(statusCode).json({
+        error: result.error,
+        details: result.details
+      });
+    }
+
+  } catch (error) {
+    console.error('Unlock code route error:', error);
     return res.status(500).json({
       error: 'Internal server error',
       details: error.message

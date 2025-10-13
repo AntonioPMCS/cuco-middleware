@@ -30,7 +30,7 @@ function bytesToHex(bytes) {
  * @returns {string} - The flipped hex string
  */
 function endianFlipHex(hexStr) {
-  hexStr = hexStr.toLowerCase();
+  //hexStr = hexStr.toLowerCase();
   if (hexStr.length % 2 !== 0) {
     throw new Error("Hex string must have even length");
   }
@@ -38,10 +38,25 @@ function endianFlipHex(hexStr) {
   return hexStr.match(/../g).reverse().join("");
 }
 
+function padStr(str) {
+  return str.toUpperCase().padStart(8, '0');
+}
+
+const extractFiveBytesHex = (hashHex) => {
+  const bytes = Buffer.from(hashHex, 'hex');                 // 64 hex -> 32 bytes
+  const offset = bytes.reduce((a, x) => a ^ x, 0) & 0x0f;    // XOR then mask 0x0f
+  const extracted = Buffer.from(bytes.subarray(offset, offset + 5))
+    .toString('hex')
+    .toUpperCase();                                          // 5 bytes -> 10 hex chars
+  return {offset, extracted}
+};
+
 
 module.exports = {
   hexToBytes,
   bytesToHex,
-  endianFlipHex
+  endianFlipHex,
+  padStr,
+  extractFiveBytesHex
 };
   

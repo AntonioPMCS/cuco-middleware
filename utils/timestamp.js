@@ -78,7 +78,7 @@ function generateLDField(ticketlifetime) {
   const LD = currentTimestampSeconds - CUCO_EPOCH + ticketlifetime;
   
   // Convert to hexadecimal
-  const hexLD = LD.toString(16);
+  const hexLD = LD.toString(16).toUpperCase();
 
   //Log the LD field value
   console.log("LD field value: ", hexLD);

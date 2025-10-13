@@ -6,6 +6,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { padStr } = require('../utils/bytes');
+const { endianFlipHex, extractFiveBytesHex } = require('../utils/bytes');
 
 class AuthKeyService {
   constructor() {
@@ -67,6 +69,41 @@ class AuthKeyService {
    */
   hasAuthKey(deviceSN) {
     return this.keys.hasOwnProperty(deviceSN);
+  }
+
+  async generateUnlockCode(unlockKey, ct, uc, cid, cryptoService) {
+    console.log("Params - Unlock Key:", unlockKey, "| CT:", ct, "| UC:", uc, "| CID:", cid);
+    
+    let _ct = padStr(ct);
+    let _uc = padStr(uc);
+    console.log("Padded - CT:", _ct, "| UC:", _uc);
+
+    let _cid = endianFlipHex(cid);
+    let _unlockKey = endianFlipHex(unlockKey);
+    _ct = endianFlipHex(_ct);
+    _uc = endianFlipHex(_uc);
+
+    // Log flipped variables
+    console.log("Flipped - CID:", _cid, "| Unlock Key:", _unlockKey, "| CT:", _ct, "| UC:", _uc);
+    
+    let unlockCode = _unlockKey + _uc + _cid + _ct;
+    console.log("Concatenated Code:", unlockCode);
+
+
+
+    unlockCode = await cryptoService.sha256Hex(unlockCode);
+    console.log("Hashed Key:", unlockCode);
+    const result = extractFiveBytesHex(unlockCode);
+    console.log("Extracted bytes: ", result.extracted)
+    unlockCode = result.extracted;
+
+    unlockCode = endianFlipHex(unlockCode);
+    console.log("Endian Flipped Hex:", unlockCode);
+
+    unlockCode = (result.offset.toString(16) + unlockCode).toLowerCase();  
+    console.log("End result unlock code: ", unlockCode);
+
+    return unlockCode;
   }
 }
 

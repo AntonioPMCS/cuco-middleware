@@ -34,6 +34,17 @@ class CryptographyService {
       console.log("Hash Hex: ", hashHex);
       return hashHex;
     }
+
+    /**
+     * Generate SHA-256 hash of a string
+     * @param {string} message - The message to hash
+     * @returns {Promise<string>} - The SHA-256 hex string
+     */
+    async sha256Hex(message) {
+      return crypto.createHash('sha256').update(message, "hex").digest('hex');
+    }
+
+    
 }
 
 module.exports = CryptographyService;

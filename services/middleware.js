@@ -121,7 +121,7 @@ class MiddlewareService {
     
     
     // Determine TT value based on 't' parameter and deviceState
-    let ttValue;
+
     if (params.t === 'checkme') {
       data.push(["TT", "S"]);
       data.push(["IT", this.getFieldValue("IT")]);
@@ -134,7 +134,7 @@ class MiddlewareService {
       data.push(["TW", this.getFieldValue("TW")]); 
       data.push(["MaxUC", this.getFieldValue("MaxUC")]);
 
-      authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+      authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
       data.push(["Authenticator", authenticator]);
 
       data.push(["AKT", "S"]);
@@ -151,7 +151,7 @@ class MiddlewareService {
           data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
           data.push(["CT", generateCTField()]);
 
-          authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
           data.push(["Authenticator", authenticator]);
           break;
 
@@ -164,8 +164,7 @@ class MiddlewareService {
           data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
           data.push(["TW", this.getFieldValue("TW")]); 
           data.push(["MaxUC", this.getFieldValue("MaxUC")]);
-
-          authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
           data.push(["Authenticator", authenticator]);
           break;
 
@@ -174,7 +173,7 @@ class MiddlewareService {
           data.push(["BT", this.getFieldValue("BT")]);
           data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
           data.push(["CT", generateCTField()]);
-          authenticator = "HMAC-SHA256 " + await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"]));
+          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
           data.push(["Authenticator", authenticator]);
 
           break;
@@ -185,6 +184,25 @@ class MiddlewareService {
     }
 
     return serializeData(data);
+  }
+
+  async processUnlockRequest(authKeyService, cryptoService, params) {
+    const { cid, ct, uc } = params;
+    // Step 1: Validate request parameters
+    if (!cid || !ct || !uc) {
+      return {
+        success: false,
+        error: 'Missing required parameters "cid", "ct", and "uc" for unlock request',
+        statusCode: 400
+      };
+    }
+
+    console.log("Processing unlock request with params: ", params);
+    const unlockKey = authKeyService.getKeys("0x"+cid.toLowerCase())["UK"];
+    return {
+      success: true,
+      data: await authKeyService.generateUnlockCode(unlockKey, ct, uc, cid, cryptoService)
+    };
   }
 }
 

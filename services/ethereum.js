@@ -54,7 +54,7 @@ class EthereumService {
     //   console.error('Error calling device metadata:', error);
     //   throw new Error(`Failed to get device metadata: ${error.message}`);
     // }
-    return 'ipfs://bafkreib55r7osq7xpnnji2lc2ix5iljabblmpomtd5bacm7ibz3coybuli';
+    return 'ipfs://bafkreihccimod2m7y7txvnm34kocealmr7u2yurqohwgleaslloh2fokzi';
   }
 
   async getDeviceSerialNumber(deviceAddress) {

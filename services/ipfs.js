@@ -2,10 +2,16 @@ const https = require('https');
 
 class IPFSService {
   constructor() {
-    // Default IPFS gateway using path format
-    this.gateway = 'gateway.pinata.cloud';
+    // Load IPFS gateways from environment variable (comma-separated)
+    // Falls back to default gateways if not set
+    const defaultGateways = 'ipfs.io,dweb.link,cloudflare-ipfs.com';
+    this.gateways = (process.env.IPFS_GATEWAYS || defaultGateways)
+      .split(',')
+      .map(g => g.trim())
+      .filter(g => g.length > 0);
+    
     console.log('✅ IPFS service initialized');
-    console.log(`📋 IPFS Gateway: ${this.gateway}`);
+    console.log(`📋 IPFS Gateways (${this.gateways.length}): ${this.gateways.join(', ')}`);
   }
 
   async getFile(cid) {
@@ -14,12 +20,25 @@ class IPFSService {
         throw new Error('CID parameter is required');
       }
 
-      // Use path format: https://{gateway}/ipfs/{cid}
-      const url = `https://${this.gateway}/ipfs/${cid}`;
-      console.log(`🔍 Fetching IPFS file: ${url}`);
+      // Try each gateway until one succeeds
+      let lastError = null;
+      for (const gateway of this.gateways) {
+        try {
+          const url = `https://${gateway}/ipfs/${cid}`;
+          console.log(`🔍 Fetching IPFS file from ${gateway}: ${url}`);
+          
+          const response = await this.fetchFromUrl(url);
+          console.log(`✅ Successfully fetched from ${gateway}`);
+          return response;
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch from ${gateway}: ${error.message}`);
+          lastError = error;
+          // Continue to next gateway
+        }
+      }
 
-      const response = await this.fetchFromUrl(url);
-      return response;
+      // If all gateways failed, throw the last error
+      throw new Error(`All IPFS gateways failed. Last error: ${lastError.message}`);
     } catch (error) {
       console.error('Error fetching IPFS file:', error);
       throw new Error(`Failed to fetch IPFS file: ${error.message}`);
