@@ -81,4 +81,18 @@ router.get('/ucode/getcode', async (req, res) => {
   }
 });
 
+// Route handler for unlock code generation
+router.get('/placeholder', async (req, res) => {
+  try {
+  } catch (error) {
+    console.error('Unlock code route error:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+
+
 module.exports = router;

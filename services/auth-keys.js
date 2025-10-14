@@ -50,7 +50,13 @@ class AuthKeyService {
   getKeys(deviceSN) {
     this.loadKeys();
     console.log("Keys: ", this.keys);
-    return this.keys[deviceSN];
+    // For loop to search for the deviceSN in the keys
+    for (const key in this.keys) {
+      if (key.includes(deviceSN)) {
+        return this.keys[key];
+      }
+    }
+    //return this.keys.includes [deviceSN];
   }
 
 

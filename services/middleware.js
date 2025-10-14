@@ -59,7 +59,7 @@ class MiddlewareService {
     
     try {
       const { s, d, t } = params;
-      let deviceAddress = "0x"+t.toLowerCase();
+      let deviceAddress;
       
       // Step 1: Validate request parameters
       if (t === 'checkme') {
@@ -70,9 +70,13 @@ class MiddlewareService {
             statusCode: 400
           };
         } else {
-          deviceAddress = (await ethereumService.getDeviceBySn(s)).toLowerCase();
+          deviceAddress = (await ethereumService.getDeviceBySn(s));
         }
-      }
+      } 
+
+      const deviceKeys = authKeyService.getKeys(
+                          deviceAddress?.slice(10).toUpperCase() || t)
+      deviceAddress = deviceKeys.Address;
       
       // Step 2: Fetch blockchain data
       // TODO: Make this a single call using the multicall contract
@@ -91,7 +95,7 @@ class MiddlewareService {
       }
       
       // Step 4: Transform data for client
-      const transformedData = await this.transformDataForClient(deviceState, deviceAddress, cryptoService, authKeyService, params);
+      const transformedData = await this.transformDataForClient(deviceState, deviceKeys, cryptoService, authKeyService, params);
       
       return {
         success: true,
@@ -112,10 +116,10 @@ class MiddlewareService {
    * Transform IPFS content into clean client response
    * Adds middleware-specific fields and organizes data
    */
-  async transformDataForClient(deviceState, deviceAddress, cryptoService, authKeyService, params) {
+  async transformDataForClient(deviceState, deviceKeys, cryptoService, authKeyService, params) {
 
-    const keys = authKeyService.getKeys(deviceAddress);
     let authenticator;
+    const sn = deviceKeys.Address.slice(10).toUpperCase();
     // Start with V=1 at position 0
     const data = [["V", "1"]];
     
@@ -128,18 +132,18 @@ class MiddlewareService {
       // Add specific fields from IPFS content in order, with defaults as fallback
       data.push(["BT", this.getFieldValue("BT")]);
       data.push(["BW", this.getFieldValue("BW")]);
-      data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+      data.push(["SN", sn]); 
       data.push(["CT", generateCTField()]);
       data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
       data.push(["TW", this.getFieldValue("TW")]); 
       data.push(["MaxUC", this.getFieldValue("MaxUC")]);
 
-      authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
+      authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys.AK)));
       data.push(["Authenticator", authenticator]);
 
       data.push(["AKT", "S"]);
-      data.push(["AK", keys["AK"]]);
-      data.push(["UK", keys["UK"]]);
+      data.push(["AK", deviceKeys.AK]);
+      data.push(["UK", deviceKeys.UK]);
 
     } else {
 
@@ -148,10 +152,10 @@ class MiddlewareService {
           data.push(["TT", 'F']);
           data.push(["IT", this.getFieldValue("IT")]);
           // Add specific fields from IPFS content in order, with defaults as fallback
-          data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+          data.push(["SN", sn]);
           data.push(["CT", generateCTField()]);
 
-          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
+          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys["AK"])));
           data.push(["Authenticator", authenticator]);
           break;
 
@@ -159,21 +163,21 @@ class MiddlewareService {
           data.push(["TT", 'N']);
           data.push(["BT", this.getFieldValue("BT")]);
           data.push(["BW", this.getFieldValue("BW")]);
-          data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+          data.push(["SN", sn]);
           data.push(["CT", generateCTField()]);
           data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
           data.push(["TW", this.getFieldValue("TW")]); 
           data.push(["MaxUC", this.getFieldValue("MaxUC")]);
-          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
+          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys.AK)));
           data.push(["Authenticator", authenticator]);
           break;
 
         case "2": // Blocked
           data.push(["TT", 'B']);
           data.push(["BT", this.getFieldValue("BT")]);
-          data.push(["SN", deviceAddress.toUpperCase().slice(2)]);
+          data.push(["SN", sn]);
           data.push(["CT", generateCTField()]);
-          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(keys["AK"])));
+          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys.AK)));
           data.push(["Authenticator", authenticator]);
 
           break;
