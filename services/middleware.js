@@ -5,9 +5,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { generateCTField, generateLDField, hexToDateString } = require('../utils/timestamp');
-const { serializeData } = require('../utils/parsers');
-const { endianFlipHex } = require('../utils/bytes');
+const TicketFactory = require('../entities/TicketFactory');
 
 class MiddlewareService {
   constructor() {
@@ -36,15 +34,6 @@ class MiddlewareService {
     }
   }
 
-  /**
-   * Get field value with fallback to defaults
-   * @param {string} fieldName - Field name (e.g., "BT", "BW", "SN")
-   * @returns {string} - Field value or default
-   */
-  getFieldValue(fieldName) {
-    // First try to get from IPFS content
-    return this.deviceData[fieldName] || this.defaults[fieldName] || '';
-  }
 
   /**
    * Process complete middleware flow:
@@ -62,22 +51,30 @@ class MiddlewareService {
       let deviceAddress;
       
       // Step 1: Validate request parameters
-      if (t === 'checkme') {
-        if (!s || !d) {
+      switch (t) {
+        case 'checkme':
+          if (!s || !d) {
+            return {
+              success: false,
+              error: 'Missing required parameters "s" and "d" for checkme request',
+              statusCode: 400
+            };
+          }
+          deviceAddress = (await ethereumService.getDeviceBySn(s));
+          break;
+        case undefined:
           return {
             success: false,
-            error: 'Missing required parameters "s" and "d" for checkme request',
+            error: 'Missing required parameter "t"',
             statusCode: 400
           };
-        } else {
-          deviceAddress = (await ethereumService.getDeviceBySn(s));
-        }
-      } 
-
+        default:
+          break;
+      }
       const deviceKeys = authKeyService.getKeys(
-                          deviceAddress?.slice(10).toUpperCase() || t)
+        deviceAddress?.slice(10).toUpperCase() || t)
       deviceAddress = deviceKeys.Address;
-      
+
       // Step 2: Fetch blockchain data
       // TODO: Make this a single call using the multicall contract
       console.log('🔗 Fetching blockchain data...');
@@ -94,8 +91,9 @@ class MiddlewareService {
         this.deviceData = JSON.parse(ipfsContentString);
       }
       
-      // Step 4: Transform data for client
-      const transformedData = await this.transformDataForClient(deviceState, deviceKeys, cryptoService, authKeyService, params);
+      // Step 4: Create ticket using factory
+      const ticket = TicketFactory.createTicket(deviceState, deviceKeys, this.deviceData, this.defaults, params);
+      const transformedData = await ticket.serialize(cryptoService);
       
       return {
         success: true,
@@ -112,83 +110,6 @@ class MiddlewareService {
     }
   }
 
-  /**
-   * Transform IPFS content into clean client response
-   * Adds middleware-specific fields and organizes data
-   */
-  async transformDataForClient(deviceState, deviceKeys, cryptoService, authKeyService, params) {
-
-    let authenticator;
-    const sn = deviceKeys.Address.slice(10).toUpperCase();
-    // Start with V=1 at position 0
-    const data = [["V", "1"]];
-    
-    
-    // Determine TT value based on 't' parameter and deviceState
-
-    if (params.t === 'checkme') {
-      data.push(["TT", "S"]);
-      data.push(["IT", this.getFieldValue("IT")]);
-      // Add specific fields from IPFS content in order, with defaults as fallback
-      data.push(["BT", this.getFieldValue("BT")]);
-      data.push(["BW", this.getFieldValue("BW")]);
-      data.push(["SN", sn]); 
-      data.push(["CT", generateCTField()]);
-      data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
-      data.push(["TW", this.getFieldValue("TW")]); 
-      data.push(["MaxUC", this.getFieldValue("MaxUC")]);
-
-      authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys.AK)));
-      data.push(["Authenticator", authenticator]);
-
-      data.push(["AKT", "S"]);
-      data.push(["AK", deviceKeys.AK]);
-      data.push(["UK", deviceKeys.UK]);
-
-    } else {
-
-      switch (deviceState) {
-        case "0": // Free
-          data.push(["TT", 'F']);
-          data.push(["IT", this.getFieldValue("IT")]);
-          // Add specific fields from IPFS content in order, with defaults as fallback
-          data.push(["SN", sn]);
-          data.push(["CT", generateCTField()]);
-
-          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys["AK"])));
-          data.push(["Authenticator", authenticator]);
-          break;
-
-        case "1": // Normal
-          data.push(["TT", 'N']);
-          data.push(["BT", this.getFieldValue("BT")]);
-          data.push(["BW", this.getFieldValue("BW")]);
-          data.push(["SN", sn]);
-          data.push(["CT", generateCTField()]);
-          data.push(["LD", generateLDField(this.getFieldValue("ticketlifetime"))]);
-          data.push(["TW", this.getFieldValue("TW")]); 
-          data.push(["MaxUC", this.getFieldValue("MaxUC")]);
-          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys.AK)));
-          data.push(["Authenticator", authenticator]);
-          break;
-
-        case "2": // Blocked
-          data.push(["TT", 'B']);
-          data.push(["BT", this.getFieldValue("BT")]);
-          data.push(["SN", sn]);
-          data.push(["CT", generateCTField()]);
-          authenticator = "HMAC-SHA256 " + endianFlipHex( await cryptoService.hmacSha256Hex(serializeData(data), endianFlipHex(deviceKeys.AK)));
-          data.push(["Authenticator", authenticator]);
-
-          break;
-        default:
-          ttValue = "Unknown";
-          break;
-      }
-    }
-
-    return serializeData(data);
-  }
 
   async processUnlockRequest(authKeyService, cryptoService, params) {
     const { cid, ct, uc } = params;
@@ -202,7 +123,7 @@ class MiddlewareService {
     }
 
     console.log("Processing unlock request with params: ", params);
-    const unlockKey = authKeyService.getKeys("0x"+cid.toLowerCase())["UK"];
+    const unlockKey = authKeyService.getKeys(cid.toUpperCase())["UK"];
     return {
       success: true,
       data: await authKeyService.generateUnlockCode(unlockKey, ct, uc, cid, cryptoService)

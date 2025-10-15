@@ -5,7 +5,7 @@ class EthereumMock {
   }
 
   async getDeviceBySn(sn) {
-    return '0x123ec58b06bF6305B886793AA20A2da31D034E68';
+    return '0x73A99b188A1054aAc0A0D77cEB6883eF0FC1c515';
   }
 
   async getDeviceMetadata(deviceAddress) {
